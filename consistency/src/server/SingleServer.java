@@ -9,6 +9,11 @@ import java.net.InetSocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * @author arun
+ *
+ * This class implements a simple echo server using non-blocking IO.
+ */
 public class SingleServer {
     public static final int DEFAULT_PORT = 2000;
     public static final String DEFAULT_ENCODING = "ISO-8859-1";
@@ -35,8 +40,8 @@ public class SingleServer {
     protected void handleMessageFromClient(byte[] bytes, NIOHeader header) {
         // simple echo server
         try {
-            log.log(Level.INFO, "{0} received from {1}", new Object[]{this
-                    .clientMessenger.getListeningSocketAddress(), header.sndr});
+            log.log(Level.INFO, "{0} received message from {1}", new Object[]
+                    {this.clientMessenger.getListeningSocketAddress(), header.sndr});
             this.clientMessenger.send(header.sndr, bytes);
         } catch (IOException e) {
             e.printStackTrace();
@@ -52,6 +57,10 @@ public class SingleServer {
 
                 args.length>0?Integer.parseInt(args[0]
                         .replaceAll(".*:","")):DEFAULT_PORT);
+    }
+
+    public void close() {
+        this.clientMessenger.stop();
     }
 
     public static void main(String[] args) throws IOException {

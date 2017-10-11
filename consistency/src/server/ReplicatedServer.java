@@ -9,16 +9,29 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.logging.Level;
 
+/**
+ * @author arun
+ *
+ * This class extends {@link SingleServer} to implement a simple echo +
+ * lazy-relay replicated server.
+ */
 public class ReplicatedServer extends SingleServer {
     public static final String SERVER_PREFIX = "server.";
+    public static final int SERVER_PORT_OFFSET = 1000;
 
     protected final String myID;
     protected final MessageNIOTransport<String,String> serverMessenger;
 
+    /**
+     *
+     * @param nodeConfig consists of server names and server-facing addresses
+     * @param myID
+     * @throws IOException
+     */
     public ReplicatedServer(NodeConfig<String> nodeConfig, String myID) throws
             IOException {
         super(new InetSocketAddress(nodeConfig.getNodeAddress(myID),
-                nodeConfig.getNodePort(myID)));
+                nodeConfig.getNodePort(myID)-SERVER_PORT_OFFSET));
         this.myID = myID;
         this.serverMessenger = new
                 MessageNIOTransport<String, String>(myID, nodeConfig,
@@ -31,7 +44,7 @@ public class ReplicatedServer extends SingleServer {
                             }
                         }, true);
         log.log(Level.INFO, "Server {0} started on {1}", new Object[]{this
-                .myID, this.serverMessenger.getListeningSocketAddress()});
+                .myID, this.clientMessenger.getListeningSocketAddress()});
     }
 
     // TODO: process bytes received from clients here
@@ -56,6 +69,11 @@ public class ReplicatedServer extends SingleServer {
                 new Object[]{this.myID, header.sndr}); // simply log
     }
 
+    public void close() {
+        super.close();
+        this.serverMessenger.stop();
+    }
+
     /**
      *
      * @param args The first argument is the properties file and the rest are
@@ -65,9 +83,8 @@ public class ReplicatedServer extends SingleServer {
     public static void main(String[] args) throws IOException {
         if(args.length>1)
             for(int i=1; i<args.length; i++)
-                new ReplicatedServer(NodeConfigUtils
-                        .getNodeConfigFromFile(args[0], SERVER_PREFIX), args[i]
-                        .trim());
+                new ReplicatedServer(NodeConfigUtils.getNodeConfigFromFile(args[0],
+                        SERVER_PREFIX, SERVER_PORT_OFFSET), args[i].trim());
         else log.info("Incorrect number of arguments; not starting any server");
     }
 }
