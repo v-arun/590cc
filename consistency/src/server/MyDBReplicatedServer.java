@@ -15,11 +15,11 @@ import java.util.logging.Level;
  * {@link ReplicatedServer} for a starting point.
  */
 public class MyDBReplicatedServer extends MyDBSingleServer {
-    public MyDBReplicatedServer(NodeConfig<String> nodeConfig, String myID)
-            throws IOException {
+    public MyDBReplicatedServer(NodeConfig<String> nodeConfig, String myID,
+                                InetSocketAddress isaDB) throws IOException {
         super(new InetSocketAddress(nodeConfig.getNodeAddress(myID),
                 nodeConfig.getNodePort(myID)-ReplicatedServer
-                        .SERVER_PORT_OFFSET));
+                        .SERVER_PORT_OFFSET), isaDB, myID);
     }
     public void close() {
         super.close();

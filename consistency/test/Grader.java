@@ -29,6 +29,8 @@ public class Grader extends DefaultTest{
     private static final String DEFAULT_KEYSPACE = "demo";
     private static final InetSocketAddress DEFAULT_SADDR = new InetSocketAddress
             ("localhost", 1999);
+    private static final InetSocketAddress DEFAULT_DB_ADDR = new
+            InetSocketAddress("localhost", 9042);
     private static final int NUM_SERVERS = 3;
     private static final int SLEEP = 1000;
     private static final String CONFIG_FILE = System.getProperty("config")
@@ -42,15 +44,16 @@ public class Grader extends DefaultTest{
     private static Cluster cluster;
     private static Session session = (cluster=Cluster.builder().addContactPoint
             (DEFAULT_SADDR
-                    .getHostName()).build()).connect("demo");
+                    .getHostName()).build()).connect(DEFAULT_KEYSPACE);
 
     private static final boolean GRADING_MODE = false;
 
     @BeforeClass
     public static void setup() throws IOException {
         // setup single server
-        singleServer = GRADING_MODE ? new MyDBSingleServer(DEFAULT_SADDR) :
-                new AVDBSingleServer(DEFAULT_SADDR);
+        singleServer = GRADING_MODE ? new MyDBSingleServer(DEFAULT_SADDR,
+                DEFAULT_DB_ADDR, DEFAULT_KEYSPACE) :
+                new AVDBSingleServer(DEFAULT_SADDR, DEFAULT_DB_ADDR, DEFAULT_KEYSPACE);
         NodeConfig<String> nodeConfigServer = NodeConfigUtils.getNodeConfigFromFile
                 (CONFIG_FILE, ReplicatedServer.SERVER_PREFIX, ReplicatedServer
                         .SERVER_PORT_OFFSET);
@@ -66,8 +69,8 @@ public class Grader extends DefaultTest{
         int i=0;
         for(String node : nodeConfigServer.getNodeIDs())
             replicatedServers[i++] = GRADING_MODE ? new MyDBReplicatedServer
-                    (nodeConfigServer, node) : new AVDBReplicatedServer
-                    (nodeConfigServer, node);
+                    (nodeConfigServer, node, DEFAULT_DB_ADDR) : new AVDBReplicatedServer
+                    (nodeConfigServer, node, DEFAULT_DB_ADDR);
 
         // setup frequently used information
         i=0;

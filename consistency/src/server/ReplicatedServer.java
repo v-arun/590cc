@@ -23,15 +23,15 @@ public class ReplicatedServer extends SingleServer {
     protected final MessageNIOTransport<String,String> serverMessenger;
 
     /**
-     *
      * @param nodeConfig consists of server names and server-facing addresses
-     * @param myID
+     * @param myID is my node name as well as the keyspace name
+     * @param isaDB is the socket address of the database
      * @throws IOException
      */
-    public ReplicatedServer(NodeConfig<String> nodeConfig, String myID) throws
-            IOException {
+    public ReplicatedServer(NodeConfig<String> nodeConfig, String myID,
+                            InetSocketAddress isaDB) throws IOException {
         super(new InetSocketAddress(nodeConfig.getNodeAddress(myID),
-                nodeConfig.getNodePort(myID)-SERVER_PORT_OFFSET));
+                nodeConfig.getNodePort(myID)-SERVER_PORT_OFFSET), isaDB, myID);
         this.myID = myID;
         this.serverMessenger = new
                 MessageNIOTransport<String, String>(myID, nodeConfig,
@@ -84,7 +84,8 @@ public class ReplicatedServer extends SingleServer {
         if(args.length>1)
             for(int i=1; i<args.length; i++)
                 new ReplicatedServer(NodeConfigUtils.getNodeConfigFromFile(args[0],
-                        SERVER_PREFIX, SERVER_PORT_OFFSET), args[i].trim());
+                        SERVER_PREFIX, SERVER_PORT_OFFSET), args[i].trim(),
+                        new InetSocketAddress("localhost", 9042));
         else log.info("Incorrect number of arguments; not starting any server");
     }
 }

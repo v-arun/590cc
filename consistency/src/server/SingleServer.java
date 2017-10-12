@@ -5,6 +5,7 @@ import edu.umass.cs.nio.MessageNIOTransport;
 import edu.umass.cs.nio.nioutils.NIOHeader;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,18 +23,17 @@ public class SingleServer {
             .class.getName());
     protected final MessageNIOTransport<String,String> clientMessenger;
 
-    public SingleServer(InetSocketAddress isa) throws IOException {
+    public SingleServer(InetSocketAddress isa, InetSocketAddress isaDB, String
+            keyspace) throws IOException {
         this.clientMessenger = new
                 MessageNIOTransport<String, String>(isa.getAddress(), isa.getPort(),
-                new
-                        AbstractBytePacketDemultiplexer() {
-
-                            @Override
-                            public boolean handleMessage(byte[] bytes, NIOHeader nioHeader) {
-                                handleMessageFromClient(bytes, nioHeader);
-                                return true;
-                            }
-                        });
+                new AbstractBytePacketDemultiplexer() {
+                    @Override
+                    public boolean handleMessage(byte[] bytes, NIOHeader nioHeader) {
+                        handleMessageFromClient(bytes, nioHeader);
+                        return true;
+                    }
+                });
     }
 
     // TODO: process bytes received from clients here
@@ -64,6 +64,7 @@ public class SingleServer {
     }
 
     public static void main(String[] args) throws IOException {
-        new SingleServer(getSocketAddress(args));
+        new SingleServer(getSocketAddress(args), new InetSocketAddress
+                ("localhost", 9042), "demo");
     };
 }

@@ -14,7 +14,8 @@ import java.util.logging.Logger;
  * operation on the database and return the response back to the client.
  */
 public class MyDBSingleServer extends SingleServer {
-    public MyDBSingleServer(InetSocketAddress isa) throws IOException {
-        super(isa);
+    public MyDBSingleServer(InetSocketAddress isa, InetSocketAddress isaDB,
+                            String keyspace) throws IOException {
+        super(isa, isaDB, keyspace);
     }
 }
