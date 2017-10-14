@@ -1,4 +1,3 @@
-import client.AVDBClient;
 import client.Client;
 import client.MyDBClient;
 import com.datastax.driver.core.Cluster;
@@ -53,7 +52,8 @@ public class Grader extends DefaultTest{
         // setup single server
         singleServer = GRADING_MODE ? new MyDBSingleServer(DEFAULT_SADDR,
                 DEFAULT_DB_ADDR, DEFAULT_KEYSPACE) :
-                new AVDBSingleServer(DEFAULT_SADDR, DEFAULT_DB_ADDR, DEFAULT_KEYSPACE);
+                new MyDBSingleServer(DEFAULT_SADDR, DEFAULT_DB_ADDR,
+                        DEFAULT_KEYSPACE);
         NodeConfig<String> nodeConfigServer = NodeConfigUtils.getNodeConfigFromFile
                 (CONFIG_FILE, ReplicatedServer.SERVER_PREFIX, ReplicatedServer
                         .SERVER_PORT_OFFSET);
@@ -62,14 +62,15 @@ public class Grader extends DefaultTest{
         NodeConfig<String> nodeConfigClient = NodeConfigUtils.getNodeConfigFromFile
                 (CONFIG_FILE, ReplicatedServer.SERVER_PREFIX);
         client = GRADING_MODE ? new MyDBClient(nodeConfigClient) : new
-                AVDBClient(nodeConfigClient);
+                MyDBClient(nodeConfigClient);
 
         // setup replicated servers
         replicatedServers = new SingleServer[nodeConfigServer.getNodeIDs().size()];
         int i=0;
         for(String node : nodeConfigServer.getNodeIDs())
             replicatedServers[i++] = GRADING_MODE ? new MyDBReplicatedServer
-                    (nodeConfigServer, node, DEFAULT_DB_ADDR) : new AVDBReplicatedServer
+                    (nodeConfigServer, node, DEFAULT_DB_ADDR) : new
+                    MyDBReplicatedServer
                     (nodeConfigServer, node, DEFAULT_DB_ADDR);
 
         // setup frequently used information
