@@ -111,12 +111,13 @@ public class Grader extends DefaultTest{
 
 
     @Test
-    public void test03_InsertRecords_Async() throws IOException {
+    public void test03_InsertRecords_Async() throws IOException, InterruptedException {
         for(int i=0; i<10; i++) {
             send("insert into " + TABLE + " (ssn, firstname, lastname) " +
                     "values (" + (int)(Math.random()*Integer.MAX_VALUE) + ", '" +
                     "John"+i + "', '" + "Smith"+i +"')", true);
         }
+        Thread.sleep(SLEEP);
     }
 
     @Test
