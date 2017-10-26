@@ -1,29 +1,39 @@
-import client.Client;
-import client.MyDBClient;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.net.InetSocketAddress;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.FixMethodOrder;
+import org.junit.Test;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Result;
+import org.junit.runner.notification.Failure;
+
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
+
+import client.Client;
+import client.MyDBClient;
 import edu.umass.cs.nio.interfaces.NodeConfig;
 import edu.umass.cs.nio.nioutils.NIOHeader;
 import edu.umass.cs.nio.nioutils.NodeConfigUtils;
 import edu.umass.cs.utils.DefaultTest;
-import org.junit.*;
-import org.junit.runner.JUnitCore;
-import org.junit.runner.Result;
-import org.junit.runner.notification.Failure;
-import server.*;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import server.MyDBReplicatedServer;
+import server.MyDBSingleServer;
+import server.ReplicatedServer;
+import server.SingleServer;
 
 @FixMethodOrder(org.junit.runners.MethodSorters.NAME_ASCENDING)
-public class Grader extends DefaultTest{
+public class Grader extends DefaultTest {
 
     private static final String DEFAULT_KEYSPACE = "demo";
     private static final InetSocketAddress DEFAULT_SADDR = new InetSocketAddress
@@ -33,53 +43,76 @@ public class Grader extends DefaultTest{
     private static final int NUM_SERVERS = 3;
     private static final int SLEEP = 1000;
     private static final String CONFIG_FILE = System.getProperty("config")
-            !=null ? System.getProperty("config") : "conf/servers.properties";
+            != null ? System.getProperty("config") : "conf/servers.properties";
 
     private static Client client = null;
     private static SingleServer singleServer = null;
-    private static SingleServer[] replicatedServers=null;
+    private static SingleServer[] replicatedServers = null;
     private static Map<String, InetSocketAddress> serverMap = null;
     private static String[] servers = null;
     private static Cluster cluster;
-    private static Session session = (cluster=Cluster.builder().addContactPoint
+    private static Session session = (cluster = Cluster.builder().addContactPoint
             (DEFAULT_SADDR
                     .getHostName()).build()).connect(DEFAULT_KEYSPACE);
 
+    private final static String DEFAULT_TABLE_NAME = "grade";
+
+    private static NodeConfig<String> nodeConfigServer;
+
     private static final boolean GRADING_MODE = false;
+
+    private static final int NUM_REQS = 100;
+
+    private static final int SLEEP_RATIO = 10;
 
     @BeforeClass
     public static void setup() throws IOException {
         // setup single server
         singleServer = GRADING_MODE ? new MyDBSingleServer(DEFAULT_SADDR,
                 DEFAULT_DB_ADDR, DEFAULT_KEYSPACE) :
-                new MyDBSingleServer(DEFAULT_SADDR, DEFAULT_DB_ADDR,
+                (SingleServer) getInstance(getConstructor("server" +
+                                ".AVDBSingleServer",
+                        InetSocketAddress.class, InetSocketAddress.class,
+                        String.class), DEFAULT_SADDR, DEFAULT_DB_ADDR,
                         DEFAULT_KEYSPACE);
-        NodeConfig<String> nodeConfigServer = NodeConfigUtils.getNodeConfigFromFile
+        nodeConfigServer = NodeConfigUtils.getNodeConfigFromFile
                 (CONFIG_FILE, ReplicatedServer.SERVER_PREFIX, ReplicatedServer
                         .SERVER_PORT_OFFSET);
 
         // setup client
         NodeConfig<String> nodeConfigClient = NodeConfigUtils.getNodeConfigFromFile
                 (CONFIG_FILE, ReplicatedServer.SERVER_PREFIX);
-        client = GRADING_MODE ? new MyDBClient(nodeConfigClient) : new
-                MyDBClient(nodeConfigClient);
+        client = GRADING_MODE ? new MyDBClient(nodeConfigClient) :
+                (Client) getInstance(getConstructor("client.AVDBClient",
+                        NodeConfig.class),
+                        nodeConfigClient);
 
-        // setup replicated servers
+
+        // setup replicated servers and sessions to test
         replicatedServers = new SingleServer[nodeConfigServer.getNodeIDs().size()];
-        int i=0;
-        for(String node : nodeConfigServer.getNodeIDs())
+        int i = 0;
+        // create keyspaces if not exists
+        for (String node : nodeConfigServer.getNodeIDs()) {
+            session.execute("create keyspace if not exists " + node + " with replication={'class':'SimpleStrategy', 'replication_factor' : '1'};");
+        }
+
+        for (String node : nodeConfigServer.getNodeIDs()) {
             replicatedServers[i++] = GRADING_MODE ? new MyDBReplicatedServer
-                    (nodeConfigServer, node, DEFAULT_DB_ADDR) : new
-                    MyDBReplicatedServer
-                    (nodeConfigServer, node, DEFAULT_DB_ADDR);
+                    (nodeConfigServer, node, DEFAULT_DB_ADDR) :
+
+                    (SingleServer) getInstance(getConstructor("server" +
+                                    ".AVDBReplicatedServer", NodeConfig.class, String
+                                    .class, InetSocketAddress.class),
+                            nodeConfigServer, node, DEFAULT_DB_ADDR);
+        }
 
         // setup frequently used information
-        i=0;
+        i = 0;
         servers = new String[nodeConfigServer.getNodeIDs().size()];
-        for(String node : nodeConfigServer.getNodeIDs())
+        for (String node : nodeConfigServer.getNodeIDs())
             servers[i++] = node;
         serverMap = new HashMap<String, InetSocketAddress>();
-        for(String node : nodeConfigClient.getNodeIDs())
+        for (String node : nodeConfigClient.getNodeIDs())
             serverMap.put(node, new InetSocketAddress(nodeConfigClient
                     .getNodeAddress
                             (node), nodeConfigClient.getNodePort(node)));
@@ -88,6 +121,7 @@ public class Grader extends DefaultTest{
 
     /**
      * This test tests a simple default DB command expected to always succeed.
+     *
      * @throws IOException
      * @throws InterruptedException
      */
@@ -100,6 +134,7 @@ public class Grader extends DefaultTest{
 
     /**
      * Tests that a table is indeed being created successfully.
+     *
      * @throws IOException
      * @throws InterruptedException
      */
@@ -112,10 +147,10 @@ public class Grader extends DefaultTest{
 
     @Test
     public void test03_InsertRecords_Async() throws IOException, InterruptedException {
-        for(int i=0; i<10; i++) {
+        for (int i = 0; i < 10; i++) {
             send("insert into " + TABLE + " (ssn, firstname, lastname) " +
-                    "values (" + (int)(Math.random()*Integer.MAX_VALUE) + ", '" +
-                    "John"+i + "', '" + "Smith"+i +"')", true);
+                    "values (" + (int) (Math.random() * Integer.MAX_VALUE) + ", '" +
+                    "John" + i + "', '" + "Smith" + i + "')", true);
         }
         Thread.sleep(SLEEP);
     }
@@ -134,33 +169,247 @@ public class Grader extends DefaultTest{
         testCreateTable(true, false);
     }
 
+    /**
+     * Create tables on all keyspaces.
+     * Table should always exist after this test.
+     * This test should always succeed, it is irrelevant to the total order implementation.
+     *
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    @Test
+    public void test10_CreateTables() throws IOException, InterruptedException {
+        for (String node : servers) {
+            // create default table, node is the keypsace name
+            session.execute(getCreateTableWithList(DEFAULT_TABLE_NAME, node));
+            Thread.sleep(SLEEP);
+        }
+
+        for (String node : servers) {
+            verifyTableExists(DEFAULT_TABLE_NAME, node, true);
+        }
+
+    }
+
+    /**
+     * Select a single server and send all SQL queries to the selected server.
+     * Then verify the results on all replicas to see whether they are consistent.
+     *
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    @Test
+    public void test11_UpdateRecord_SingleServer() throws IOException, InterruptedException {
+        // generate a random key for this test
+        int key = ThreadLocalRandom.current().nextInt();
+
+        String selected = servers[0];
+        // insert a record first with an empty list
+        client.send(serverMap.get(selected), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+        Thread.sleep(SLEEP);
+
+        for (int i = 0; i < servers.length; i++) {
+            client.send(serverMap.get(selected), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+            Thread.sleep(SLEEP);
+        }
+
+        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+    }
+
+    /**
+     * Send a simple SQL query to every server in a round robin manner.
+     * Then verify the results in all replicas to see whether they are consistent.
+     *
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    @Test
+    public void test12_UpdateRecord_AllServer() throws IOException, InterruptedException {
+        // generate a random key for this test
+        int key = ThreadLocalRandom.current().nextInt();
+
+        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+
+        for (String node : servers) {
+            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+            Thread.sleep(SLEEP);
+        }
+
+        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+    }
+
+    /**
+     * Send each SQL query to a random server.
+     * Then verify the results in all replicas to see whether they are consistent.
+     *
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    @Test
+    public void test13_UpdateRecord_RandomServer() throws InterruptedException, IOException {
+        // generate a random key for this test
+        int key = ThreadLocalRandom.current().nextInt();
+
+        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+
+        for (int i = 0; i < servers.length; i++) {
+            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
+            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+            Thread.sleep(SLEEP);
+        }
+
+        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+    }
+
+
+    /**
+     * This test is the same as test13, but it will send update request faster than test13, as it only sleeps 10ms
+     *
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    @Test
+    public void test14_UpdateRecordFaster_RandomServer() throws InterruptedException, IOException {
+        // generate a random key for this test
+        int key = ThreadLocalRandom.current().nextInt();
+
+        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+        // this sleep is to guarantee that the record has been created
+        Thread.sleep(SLEEP);
+
+        for (int i = 0; i < servers.length; i++) {
+            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
+            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+            // we just sleep 10 milliseconds this time
+            Thread.sleep(10);
+        }
+
+        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+    }
+
+
+    /**
+     * This test is also the same as test13, but it will send update request much faster than test13, as it only sleeps 1ms
+     *
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    @Test
+    public void test15_UpdateRecordMuchFaster_RandomServer() throws InterruptedException, IOException {
+        // generate a random key for this test
+        int key = ThreadLocalRandom.current().nextInt();
+
+        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+        // this sleep is to guarantee that the record has been created
+        Thread.sleep(SLEEP);
+
+        for (int i = 0; i < servers.length; i++) {
+            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
+            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+            // we just sleep 10 milliseconds this time
+            Thread.sleep(1);
+        }
+
+        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+    }
+
+    /**
+     * This test will not sleep and send more requests (i.e., 10)
+     *
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    @Test
+    public void test16_UpdateRecordFastest_RandomServer() throws InterruptedException, IOException {
+        // generate a random key for this test
+        int key = ThreadLocalRandom.current().nextInt();
+
+        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+        // this sleep is to guarantee that the record has been created
+        Thread.sleep(SLEEP);
+
+        for (int i = 0; i < NUM_REQS; i++) {
+            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
+            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+
+        }
+
+        Thread.sleep(SLEEP * NUM_REQS / SLEEP_RATIO);
+
+        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+    }
+
+
+    /**
+     * Clean up the default table
+     *
+     * @throws InterruptedException
+     */
+    @Test
+    public void test19_DropTables() throws InterruptedException {
+        for (String node : servers) {
+            // clean up
+            session.execute(getDropTableCmd(DEFAULT_TABLE_NAME, node));
+        }
+    }
+
     @Test
     public void test99_closeSession() {
-        session.close();;
+        session.close();
     }
 
     private void testCreateTable(boolean single, boolean sleep) throws
             IOException, InterruptedException {
-        if(sleep) testCreateTableSleep(single);
+        if (sleep) testCreateTableSleep(single);
         else testCreateTableBlocking(single);
-        verifyTableExists(TABLE);
+        verifyTableExists(TABLE, DEFAULT_KEYSPACE, true);
 
     }
-    private void verifyTableExists(String table) {
+
+    private void verifyTableExists(String table, String keyspace, boolean exists) {
         ResultSet resultSet = session.execute("select table_name from " +
-                "system_schema.tables where keyspace_name='"+DEFAULT_KEYSPACE+"'" );
+                "system_schema.tables where keyspace_name='" + keyspace + "'");
         Assert.assertTrue(!resultSet.isExhausted());
         boolean match = false;
-        for(Row row : resultSet)
+        for (Row row : resultSet)
             match = match || row.getString("table_name").equals(table);
+        if (exists)
+            Assert.assertTrue(match);
+        else
+            Assert.assertFalse(match);
+    }
+
+    private void verifyOrderConsistent(String table, int key) {
+        String[] results = new String[servers.length];
+        int i = 0;
+        for (String node : servers) {
+            ResultSet result = session.execute(readResultFromTableCmd(key, DEFAULT_TABLE_NAME, node));
+            results[i] = "";
+            for (Row row : result) {
+                results[i] += result;
+            }
+            i++;
+        }
+        i = 0;
+        boolean match = true;
+        for (String result : results) {
+            if (!results[0].equals(result))
+                match = false;
+        }
         Assert.assertTrue(match);
+
     }
 
     private void testCreateTableSleep(boolean single) throws
             InterruptedException, IOException {
-        send(getDropTableCmd(TABLE), single);
+        send(getDropTableCmd(TABLE, DEFAULT_KEYSPACE), single);
         Thread.sleep(SLEEP);
-        send(getCreateTableCmd(TABLE), single);
+        send(getCreateTableCmd(TABLE, DEFAULT_KEYSPACE), single);
         Thread.sleep(SLEEP);
     }
 
@@ -169,8 +418,8 @@ public class Grader extends DefaultTest{
 
     private void testCreateTableBlocking(boolean single) throws
             InterruptedException, IOException {
-        waitResponse(callbackSend(DEFAULT_SADDR, getDropTableCmd(TABLE)));
-        waitResponse(callbackSend(DEFAULT_SADDR, getCreateTableCmd(TABLE)));
+        waitResponse(callbackSend(DEFAULT_SADDR, getDropTableCmd(TABLE, DEFAULT_KEYSPACE)));
+        waitResponse(callbackSend(DEFAULT_SADDR, getCreateTableCmd(TABLE, DEFAULT_KEYSPACE)));
     }
 
     private Long callbackSend(InetSocketAddress isa, String request) throws
@@ -180,8 +429,9 @@ public class Grader extends DefaultTest{
         return id;
     }
 
-    private class WaitCallback implements Client.Callback{
+    private class WaitCallback implements Client.Callback {
         Long monitor; // both id and monitor
+
         WaitCallback(Long monitor) {
             this.monitor = monitor;
         }
@@ -196,11 +446,13 @@ public class Grader extends DefaultTest{
     }
 
     private long reqnum = 0;
+
     private long enqueue() {
         synchronized (outstanding) {
             return reqnum++;
         }
     }
+
     private long enqueueRequest(String request) {
         long id = enqueue();
         outstanding.put(id, request);
@@ -209,7 +461,7 @@ public class Grader extends DefaultTest{
 
     private void waitResponse(Long id) {
         synchronized (id) {
-            while(outstanding.containsKey(id))
+            while (outstanding.containsKey(id))
                 try {
                     id.wait();
                 } catch (InterruptedException e) {
@@ -226,32 +478,77 @@ public class Grader extends DefaultTest{
                 cmd);
     }
 
-    private final void send(String cmd) throws IOException {
-        send(cmd, false);
-    }
-
-
     private static final String TABLE = "users";
-    private static String getCreateTableCmd(String table) {
-        return "create table if not exists " + table + " (age int, firstname " +
+
+    private static String getCreateTableCmd(String table, String keyspace) {
+        return "create table if not exists " + keyspace + "." + table + " (age int, firstname " +
                 "text, lastname text, ssn int, address text, hash bigint, " +
                 "primary key (ssn))";
     }
-    private static String getDropTableCmd(String table) {
-        return "drop table if exists " + table;
+
+    private static String getDropTableCmd(String table, String keyspace) {
+        return "drop table if exists " + keyspace + "." + table;
+    }
+
+    private static String getCreateTableWithList(String table, String keyspace) {
+        return "create table if not exists " + keyspace + "." + table + " (id int, events list<int>, primary key (id));";
+    }
+
+    private static String insertRecordIntoTableCmd(int key, String table) {
+        return "insert into " + table + " (id, events) values (" + key + ", []);";
+    }
+
+    private static String updateRecordOfTableCmd(int key, String table) {
+        return "update " + table + " SET events=events+[" + incrSeq() + "] where id=" + key + ";";
+    }
+
+    // This is only used to fetch the result from the table by session directly connected to cassandra
+    private static String readResultFromTableCmd(int key, String table, String keyspace) {
+        return "select events from " + keyspace + "." + table + " where id=" + key + ";";
+    }
+
+    private static long sequencer = 0;
+
+    synchronized static long incrSeq() {
+        return sequencer++;
     }
 
     @AfterClass
     public static void teardown() {
-        if(replicatedServers!=null)
-            for(SingleServer s : replicatedServers)
+        if (replicatedServers != null)
+            for (SingleServer s : replicatedServers)
                 s.close();
-        if(client!=null) client.close();
-        if(singleServer!=null) singleServer.close();
+        if (client != null) client.close();
+        if (singleServer != null) singleServer.close();
         session.close();
         cluster.close();
     }
 
+    private static Object getInstance(Constructor<?> constructor,
+                                      Object... args) {
+        try {
+            return constructor.newInstance(args);
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private static Constructor<?> getConstructor(String clazz, Class<?>... types) {
+        try {
+            Class<?> instance = Class.forName(clazz);
+            return instance.getConstructor(types);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     public static void main(String[] args) throws IOException {
         Result result = JUnitCore.runClasses(Grader.class);
