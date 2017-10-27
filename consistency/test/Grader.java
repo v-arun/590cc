@@ -59,7 +59,7 @@ public class Grader extends DefaultTest {
 
     private static NodeConfig<String> nodeConfigServer;
 
-    private static final boolean GRADING_MODE = false;
+    private static final boolean GRADING_MODE = true;
 
     private static final int NUM_REQS = 100;
 
