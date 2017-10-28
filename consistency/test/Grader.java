@@ -230,6 +230,7 @@ public class Grader extends DefaultTest {
 
         // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
         client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+        Thread.sleep(SLEEP);
 
         for (String node : servers) {
             client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
