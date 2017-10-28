@@ -59,7 +59,7 @@ public class Grader extends DefaultTest {
 
     private static NodeConfig<String> nodeConfigServer;
 
-    private static final boolean GRADING_MODE = true;
+    private static final boolean GRADING_MODE = false;
 
     private static final int NUM_REQS = 100;
 
@@ -388,11 +388,13 @@ public class Grader extends DefaultTest {
     private void verifyOrderConsistent(String table, int key) {
         String[] results = new String[servers.length];
         int i = 0;
+        boolean nonEmpty = false;
         for (String node : servers) {
             ResultSet result = session.execute(readResultFromTableCmd(key, DEFAULT_TABLE_NAME, node));
             results[i] = "";
             for (Row row : result) {
                 results[i] += row;
+                nonEmpty = true;
             }
             i++;
         }
@@ -402,7 +404,9 @@ public class Grader extends DefaultTest {
             if (!results[0].equals(result))
                 match = false;
         }
-        Assert.assertTrue(match);
+        Assert.assertTrue(nonEmpty && match);
+        for(i=0; i<results.length; i++)
+            System.out.println(i+":"+results[i]);
 
     }
 
