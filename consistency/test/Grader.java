@@ -59,7 +59,7 @@ public class Grader extends DefaultTest {
 
     private static NodeConfig<String> nodeConfigServer;
 
-    private static final boolean GRADING_MODE = false;
+    private static final boolean GRADING_MODE = true;
 
     private static final int NUM_REQS = 100;
 
@@ -101,7 +101,8 @@ public class Grader extends DefaultTest {
                     (nodeConfigServer, node, DEFAULT_DB_ADDR) :
 
                     (SingleServer) getInstance(getConstructor("server" +
-                                    ".ReplicatedServer", NodeConfig.class, String
+                                    ".AVDBReplicatedServer", NodeConfig.class,
+                            String
                                     .class, InetSocketAddress.class),
                             nodeConfigServer, node, DEFAULT_DB_ADDR);
         }
