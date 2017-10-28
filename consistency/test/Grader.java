@@ -101,7 +101,7 @@ public class Grader extends DefaultTest {
                     (nodeConfigServer, node, DEFAULT_DB_ADDR) :
 
                     (SingleServer) getInstance(getConstructor("server" +
-                                    ".AVDBReplicatedServer", NodeConfig.class, String
+                                    ".ReplicatedServer", NodeConfig.class, String
                                     .class, InetSocketAddress.class),
                             nodeConfigServer, node, DEFAULT_DB_ADDR);
         }
@@ -392,7 +392,7 @@ public class Grader extends DefaultTest {
             ResultSet result = session.execute(readResultFromTableCmd(key, DEFAULT_TABLE_NAME, node));
             results[i] = "";
             for (Row row : result) {
-                results[i] += result;
+                results[i] += row;
             }
             i++;
         }
