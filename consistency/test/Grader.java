@@ -255,6 +255,7 @@ public class Grader extends DefaultTest {
 
         // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
         client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+        Thread.sleep(SLEEP);
 
         for (int i = 0; i < servers.length; i++) {
             String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
