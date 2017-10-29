@@ -290,6 +290,7 @@ public class Grader extends DefaultTest {
             Thread.sleep(10);
         }
 
+        Thread.sleep(SLEEP);
         verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
     }
 
