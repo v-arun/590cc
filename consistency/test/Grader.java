@@ -316,6 +316,7 @@ public class Grader extends DefaultTest {
             // we just sleep 10 milliseconds this time
             Thread.sleep(1);
         }
+        Thread.sleep(SLEEP);
 
         verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
     }
