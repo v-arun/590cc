@@ -44,7 +44,6 @@ public class PA4SampleClient {
 			  String line;
 			  while ((line = rd.readLine()) != null) {
 				  response.append(line);
-				  response.append('\r');
 			  }
 			  rd.close();
 			  return response.toString();
@@ -76,7 +75,9 @@ public class PA4SampleClient {
 		json.put("Location", location);
 		json.put("Id", id);
 		
-		executePost(targetUrl, json.toJSONString());
-		System.out.println("Successfully send HTTP POST request with the content "+json.toJSONString()+" to the server http://"+url+"/");
+		String response = executePost(targetUrl, json.toJSONString());
+		System.out.println("Successfully send HTTP POST request with the content "+json.toJSONString()+
+				" to the server http://"+url+"/, and receive the response "+response);
+		assert(json.toJSONString().equals(response)):"The echoed back response is not the same as the request!";
 	}
 }
