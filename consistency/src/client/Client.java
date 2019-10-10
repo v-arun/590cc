@@ -33,7 +33,7 @@ public class Client {
 
     // TODO: process responses received from server
     protected void handleResponse(byte[] bytes, NIOHeader header) {
-        // expect echo reply here
+        // expect echo reply by default here
         try {
             System.out.println(new String(bytes, SingleServer.DEFAULT_ENCODING));
         } catch (UnsupportedEncodingException e) {
@@ -61,8 +61,9 @@ public class Client {
     }
 
     /**
-     * TODO: invoke the supplied callback upon receiving the corresponding
-     * response from the remote end.
+     * TODO: This method, unlike the simple send above, should invoke the
+     * supplied callback's handleResponse method upon receiving the
+     * corresponding response from the remote end.
      *
      * @param isa
      * @param request

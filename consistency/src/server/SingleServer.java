@@ -5,7 +5,6 @@ import edu.umass.cs.nio.MessageNIOTransport;
 import edu.umass.cs.nio.nioutils.NIOHeader;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
