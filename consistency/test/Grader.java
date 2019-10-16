@@ -43,7 +43,8 @@ public class Grader extends DefaultTest {
     private static final int NUM_SERVERS = 3;
     private static final int SLEEP = 1000;
     private static final String CONFIG_FILE = System.getProperty("config")
-            != null ? System.getProperty("config") : "conf/servers.properties";
+            != null ? System.getProperty("config") :
+            "consistency/conf/servers.properties";
 
     private static Client client = null;
     private static SingleServer singleServer = null;
